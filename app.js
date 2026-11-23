@@ -63,69 +63,7 @@ function deleteVerse(v) {
   toast('말씀을 삭제했습니다');
 }
 
-function lookupPassage(result) {
-  const verses = Array.isArray(result) ? result : [result];
-  if (!verses.length || verses.some(verse =>
-    typeof verse?.reference !== 'string' || !verse.reference.trim() ||
-    typeof verse.text !== 'string' || !verse.text.trim())) throw Error('invalid response');
-  const first = verses[0].reference;
-  const last = verses.at(-1).reference;
-  const ref = verses.length === 1 ? first : first + '–' + last.split(':').at(-1);
-  const text = verses.map(verse => verse.text).join('\n');
-  if (ref.length > 120 || text.length > 12000) throw Error('response too long');
-  return {ref, text};
-}
-
-function attachLookup(form) {
-  const button = $('#lookup');
-  const status = $('#lookup-status');
-  if (!button || !status) return;
-  const endpoint = document.querySelector('meta[name="logos-lookup-endpoint"]')?.content;
-  if (!endpoint) return;
-  button.disabled = false;
-  status.textContent = '장절을 입력하고 본문을 불러오세요.';
-  const refInput = form.elements.namedItem('ref');
-  const textInput = form.elements.namedItem('text');
-  button.onclick = async () => {
-    const input = refInput.value.trim();
-    if (!input) {
-      status.textContent = '조회할 장절을 입력해 주세요.';
-      refInput.focus();
-      return;
-    }
-    const previousText = textInput.value;
-    button.disabled = true;
-    status.textContent = '개역개정 본문을 찾는 중입니다.';
-    try {
-      const url = new URL(endpoint);
-      url.searchParams.set('ref', input.replace(/[–—]/gu, '-'));
-      const response = await fetch(url, {signal: AbortSignal.timeout(10000)});
-      if (!response.ok) {
-        status.textContent = ({
-          400: '책 이름, 장, 절을 확인해 주세요. 예: 요3:16-18',
-          404: '해당 구절을 찾지 못했습니다.',
-          429: '요청이 많습니다. 잠시 후 다시 조회해 주세요.'
-        })[response.status] || '지금은 본문을 조회할 수 없습니다. 잠시 후 다시 시도해 주세요.';
-        return;
-      }
-      const passage = lookupPassage(await response.json());
-      if (!form.isConnected) return;
-      if (refInput.value.trim() !== input || textInput.value !== previousText) {
-        status.textContent = '입력 내용이 바뀌었습니다. 필요하면 다시 조회해 주세요.';
-        return;
-      }
-      refInput.value = passage.ref;
-      textInput.value = passage.text;
-      status.textContent = '개역개정 · Logos API에서 불러왔습니다. 본문을 확인하고 저장하세요.';
-    } catch {
-      status.textContent = '본문을 불러오지 못했습니다. 다시 시도하거나 본문을 붙여넣어 주세요.';
-    } finally {
-      button.disabled = false;
-    }
-  };
-}
-
-function editor(){const v=data.verses.find(v=>v.id===editId);root.innerHTML=`<h1>${v?'말씀 수정':'새 말씀 추가'}</h1><p class="muted intro">성경 본문은 입력한 그대로 사용됩니다. 번역본을 확인하여 붙여 넣어 주세요.</p><form class="panel" id="editor"><label class="field">성경 장절<input name="ref" maxlength="120" required placeholder="예: 요한복음 15:5" value="${esc(v?.ref||'')}"></label>${v ? '' : '<button type="button" class="btn small" id="lookup" disabled>개역개정 본문 불러오기</button><p class="hint" id="lookup-status" role="status">자동 조회는 연결 준비 중입니다. 본문을 붙여넣어 추가할 수 있습니다.</p>'}<label class="field">말씀 본문<textarea name="text" required maxlength="12000" placeholder="성경 본문을 입력하세요">${esc(v?.text||'')}</textarea></label><p class="hint">공백 기준으로 단어가 분리되며, 빈 줄을 포함한 줄바꿈은 보존됩니다. 구절을 수정하면 암송 단계와 오답 및 복습 기록이 초기화됩니다.</p><div class="row end"><button type="button" class="btn" id="cancel">취소</button>${v ? '<button type="button" class="btn danger" id="delete-verse">말씀 삭제</button>' : ''}<button class="btn primary" type="submit">저장하기</button></div></form>`;$('#cancel').onclick=()=>{editId=null;render()};attachLookup($('#editor'));if (v) $('#delete-verse').onclick = () => deleteVerse(v);$('#editor').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),ref=String(fd.get('ref')).trim(),text=String(fd.get('text')).trim();if(!ref||!text||!candidates({text}).length){toast('장절과 본문을 입력해 주세요');return}if(v){Object.assign(v,{ref,text,progress:0,mistakes:emptyMistakes(),reviewOn:null})}else{const nv={id:crypto.randomUUID?.()||'v'+Date.now(),ref,text,progress:0,mistakes:emptyMistakes()};data.verses.push(nv);data.selected=nv.id}save();editId=null;toast('말씀을 저장했습니다');render()}}
+function editor(){const v=data.verses.find(v=>v.id===editId);root.innerHTML=`<h1>${v?'말씀 수정':'새 말씀 추가'}</h1><p class="muted intro">성경 본문은 입력한 그대로 사용됩니다. 번역본을 확인하여 붙여 넣어 주세요.</p><form class="panel" id="editor"><label class="field">성경 장절<input name="ref" maxlength="120" required placeholder="예: 요한복음 15:5" value="${esc(v?.ref||'')}"></label><label class="field">말씀 본문<textarea name="text" required maxlength="12000" placeholder="성경 본문을 입력하세요">${esc(v?.text||'')}</textarea></label><p class="hint">공백 기준으로 단어가 분리되며, 빈 줄을 포함한 줄바꿈은 보존됩니다. 구절을 수정하면 암송 단계와 오답 및 복습 기록이 초기화됩니다.</p><div class="row end"><button type="button" class="btn" id="cancel">취소</button>${v ? '<button type="button" class="btn danger" id="delete-verse">말씀 삭제</button>' : ''}<button class="btn primary" type="submit">저장하기</button></div></form>`;$('#cancel').onclick=()=>{editId=null;render()};if (v) $('#delete-verse').onclick = () => deleteVerse(v);$('#editor').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),ref=String(fd.get('ref')).trim(),text=String(fd.get('text')).trim();if(!ref||!text||!candidates({text}).length){toast('장절과 본문을 입력해 주세요');return}if(v){Object.assign(v,{ref,text,progress:0,mistakes:emptyMistakes(),reviewOn:null})}else{const nv={id:crypto.randomUUID?.()||'v'+Date.now(),ref,text,progress:0,mistakes:emptyMistakes()};data.verses.push(nv);data.selected=nv.id}save();editId=null;toast('말씀을 저장했습니다');render()}}
 const stageNames = ['본문 읽기', '첫 빈칸', '빈칸 늘리기', '짧게 끊어 암송', '한 절 암송'];
 let recall = null;
 let reviewing = false;
