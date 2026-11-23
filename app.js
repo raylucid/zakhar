@@ -39,15 +39,31 @@ function candidates(v){return words(v).map((w,i)=>({w,i})).filter(x=>x.w!=='\n')
 function go(v){view=v;document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===v));render()}
 function render(){if(view==='library')library();else if(view==='study')study();else settings()}
 function library(){if(editId!==null){editor();return}const reviews = data.verses.filter(v => due(v));
-root.innerHTML=`<h1>내 말씀 목록</h1><p class="muted intro">구절을 추가하고, 익숙해질수록 빈칸을 늘려 암송해 보세요.</p>${reviews.length ? `<section class="panel"><h2>오늘의 복습</h2><div class="row">${reviews.map(v => `<button class="btn primary" data-review="${esc(v.id)}">${esc(v.ref)} 복습</button>`).join('')}</div></section>` : ''}<div class="toolbar"><span class="muted">등록된 구절 <b>${data.verses.length}</b>개</span><button class="btn primary" id="add">+ 말씀 추가</button></div>${data.verses.length?`<section class="verse-grid">${data.verses.map(v=>`<article class="verse-card"><div class="row"><span class="pill">${v.progress === 5 ? '첫 학습 완료' : stageNames[v.progress]}</span></div><div class="ref">${esc(v.ref)}</div><div class="preview">${esc(v.text)}</div><div class="sub">단어 ${candidates(v).length}개</div><div class="actions"><button class="btn primary small" data-study="${esc(v.id)}"> ${v.progress === 0 ? '암송 시작' : v.progress === 5 ? '암송 다시 하기' : '이어서 암송'}</button><button class="btn small" data-edit="${esc(v.id)}">수정</button><button class="btn danger small" data-delete="${esc(v.id)}">삭제</button></div></article>`).join('')}</section>`:`<div class="empty"><h2>아직 등록된 말씀이 없습니다</h2><p class="muted">첫 번째 암송 구절을 추가해 주세요.</p></div>`}`;root.querySelectorAll('[data-review]').forEach(button => button.onclick = () => {
+root.innerHTML=`<h1>내 말씀 목록</h1><p class="muted intro">구절을 추가하고, 익숙해질수록 빈칸을 늘려 암송해 보세요.</p>${reviews.length ? `<section class="panel"><h2>오늘의 복습</h2><div class="row">${reviews.map(v => `<button class="btn primary" data-review="${esc(v.id)}">${esc(v.ref)} 복습</button>`).join('')}</div></section>` : ''}<div class="toolbar"><span class="muted">등록된 구절 <b>${data.verses.length}</b>개</span><button class="btn primary" id="add">+ 말씀 추가</button></div>${data.verses.length?`<section class="verse-grid">${data.verses.map(v=>`<article class="verse-card"><div class="row"><span class="pill">${v.progress === 5 ? '첫 학습 완료' : stageNames[v.progress]}</span></div><div class="ref">${esc(v.ref)}</div><div class="preview">${esc(v.text)}</div><div class="sub">단어 ${candidates(v).length}개</div><div class="actions"><button class="btn primary small" data-study="${esc(v.id)}"> ${v.progress === 0 ? '암송 시작' : v.progress === 5 ? '암송 다시 하기' : '이어서 암송'}</button><button class="btn small" data-edit="${esc(v.id)}">수정</button><button class="btn danger small" data-delete="${esc(v.id)}">말씀 삭제</button></div></article>`).join('')}</section>`:`<div class="empty"><h2>아직 등록된 말씀이 없습니다</h2><p class="muted">첫 번째 암송 구절을 추가해 주세요.</p></div>`}`;root.querySelectorAll('[data-review]').forEach(button => button.onclick = () => {
   data.selected = button.dataset.review;
   reviewing = true;
   resetAttempt();
   save();
   go('study');
 });
-$('#add').onclick=()=>{editId='new';render()};root.querySelectorAll('[data-study]').forEach(b=>b.onclick=()=>{data.selected=b.dataset.study;save();reviewing=false;resetAttempt();go('study')});root.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{editId=b.dataset.edit;render()});root.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>{if(confirm('이 구절과 학습 기록을 삭제하시겠습니까?')){data.verses=data.verses.filter(v=>v.id!==b.dataset.delete);if(data.selected===b.dataset.delete)data.selected=data.verses[0]?.id;save();render()}})}
-function editor(){const v=data.verses.find(v=>v.id===editId);root.innerHTML=`<h1>${v?'말씀 수정':'새 말씀 추가'}</h1><p class="muted intro">성경 본문은 입력한 그대로 사용됩니다. 번역본을 확인하여 붙여 넣어 주세요.</p><form class="panel" id="editor"><label class="field">성경 장절<input name="ref" maxlength="120" required placeholder="예: 요한복음 15:5" value="${esc(v?.ref||'')}"></label><label class="field">말씀 본문<textarea name="text" required maxlength="12000" placeholder="성경 본문을 입력하세요">${esc(v?.text||'')}</textarea></label><p class="hint">공백 기준으로 단어가 분리되며, 빈 줄을 포함한 줄바꿈은 보존됩니다. 구절을 수정하면 암송 단계와 오답 및 복습 기록이 초기화됩니다.</p><div class="row end"><button type="button" class="btn" id="cancel">취소</button><button class="btn primary" type="submit">저장하기</button></div></form>`;$('#cancel').onclick=()=>{editId=null;render()};$('#editor').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),ref=String(fd.get('ref')).trim(),text=String(fd.get('text')).trim();if(!ref||!text||!candidates({text}).length){toast('장절과 본문을 입력해 주세요');return}if(v){Object.assign(v,{ref,text,progress:0,mistakes:emptyMistakes(),reviewOn:null})}else{const nv={id:crypto.randomUUID?.()||'v'+Date.now(),ref,text,progress:0,mistakes:emptyMistakes()};data.verses.push(nv);data.selected=nv.id}save();editId=null;toast('말씀을 저장했습니다');render()}}
+$('#add').onclick=()=>{editId='new';render()};root.querySelectorAll('[data-study]').forEach(b=>b.onclick=()=>{data.selected=b.dataset.study;save();reviewing=false;resetAttempt();go('study')});root.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{editId=b.dataset.edit;render()});root.querySelectorAll('[data-delete]').forEach(button => button.onclick = () => {
+  deleteVerse(data.verses.find(v => v.id === button.dataset.delete));
+});
+}
+
+function deleteVerse(v) {
+  if (!v || !confirm(`‘${v.ref}’ 말씀과 이 구절의 학습·복습 기록을 삭제하시겠습니까?`)) return;
+  data.verses = data.verses.filter(item => item.id !== v.id);
+  if (data.selected === v.id) data.selected = data.verses[0]?.id;
+  editId = null;
+  resetAttempt();
+  save();
+  render();
+  $('#add').focus();
+  toast('말씀을 삭제했습니다');
+}
+
+function editor(){const v=data.verses.find(v=>v.id===editId);root.innerHTML=`<h1>${v?'말씀 수정':'새 말씀 추가'}</h1><p class="muted intro">성경 본문은 입력한 그대로 사용됩니다. 번역본을 확인하여 붙여 넣어 주세요.</p><form class="panel" id="editor"><label class="field">성경 장절<input name="ref" maxlength="120" required placeholder="예: 요한복음 15:5" value="${esc(v?.ref||'')}"></label><label class="field">말씀 본문<textarea name="text" required maxlength="12000" placeholder="성경 본문을 입력하세요">${esc(v?.text||'')}</textarea></label><p class="hint">공백 기준으로 단어가 분리되며, 빈 줄을 포함한 줄바꿈은 보존됩니다. 구절을 수정하면 암송 단계와 오답 및 복습 기록이 초기화됩니다.</p><div class="row end"><button type="button" class="btn" id="cancel">취소</button>${v ? '<button type="button" class="btn danger" id="delete-verse">말씀 삭제</button>' : ''}<button class="btn primary" type="submit">저장하기</button></div></form>`;$('#cancel').onclick=()=>{editId=null;render()};if (v) $('#delete-verse').onclick = () => deleteVerse(v);$('#editor').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),ref=String(fd.get('ref')).trim(),text=String(fd.get('text')).trim();if(!ref||!text||!candidates({text}).length){toast('장절과 본문을 입력해 주세요');return}if(v){Object.assign(v,{ref,text,progress:0,mistakes:emptyMistakes(),reviewOn:null})}else{const nv={id:crypto.randomUUID?.()||'v'+Date.now(),ref,text,progress:0,mistakes:emptyMistakes()};data.verses.push(nv);data.selected=nv.id}save();editId=null;toast('말씀을 저장했습니다');render()}}
 const stageNames = ['본문 읽기', '첫 빈칸', '빈칸 늘리기', '짧게 끊어 암송', '한 절 암송'];
 let recall = null;
 let reviewing = false;
@@ -126,7 +142,7 @@ function study() {
   const exercise = $('#exercise');
   if (level === 0) {
     exercise.innerHTML = `<section class="study-area passage">${chunks(v).map(part => `<div>${esc(part)}</div>`).join('')}</section>
-      <p>본문을 한 번 소리 내어 읽어 보세요.</p><button class="btn primary" id="advance">첫 빈칸 풀기 →</button>`;
+      <p>본문을 한 번 읽어 보세요.</p><button class="btn primary" id="advance">첫 빈칸 풀기 →</button>`;
     $('#advance').onclick = () => nextStage(v);
   } else if (level <= 2) {
     fillBlanks(v, exercise);
@@ -219,29 +235,68 @@ function fillBlanks(v, exercise) {
   };
 }
 
+function comparableRecall(text) {
+  return text.normalize('NFC').replace(/[\p{P}\s]/gu, '');
+}
+
+let recallMode = 'speak';
+try {
+  if (localStorage.getItem('versepath.recallMode') === 'type') recallMode = 'type';
+} catch {}
+
 function recite(v, exercise, partial) {
   const parts = chunks(v);
   recall ??= {index: 0, phase: partial ? 'read' : 'recall', hint: false, assisted: false, focus: false};
   const part = partial ? parts[recall.index] : v.text;
   const heading = partial ? `짧은 구절 ${recall.index + 1} / ${parts.length}` : v.ref;
+  const typing = recallMode === 'type';
+  const typedCorrectly = typing && comparableRecall(recall.draft || '') === comparableRecall(part);
+  const modeControls = recall.phase === 'compare' ? '' : `<div class="row recall-mode" role="group" aria-label="암송 방식">
+    <button class="btn small" id="speak-recall" aria-pressed="${!typing}">소리 내어 암송</button>
+    <button class="btn small" id="type-recall" aria-pressed="${typing}">직접 입력</button></div>`;
   let controls;
   if (recall.phase === 'read') {
-    controls = `<p class="recall-text">${esc(part)}</p><button class="btn primary" id="hide-text">가리고 말하기</button>`;
+    controls = `<p class="recall-text">${esc(part)}</p><button class="btn primary" id="hide-text">${typing ? '가리고 입력하기' : '가리고 말하기'}</button>`;
   } else if (recall.phase === 'recall') {
-    controls = `<p>기억나는 대로 소리 내어 말해 보세요.</p>
+    controls = `<p>${typing ? '기억나는 대로 본문을 입력해 보세요.' : '기억나는 대로 소리 내어 말해 보세요.'}</p>
       ${recall.hint ? `<p role="status">첫 단어 · ${esc(part.trim().split(/\s+/u)[0])}</p>` : '<button class="btn" id="hint">첫 단어 힌트</button>'}
-      <button class="btn primary" id="reveal">원문과 대조하기</button>`;
+      ${typing ? `<form id="recall-form" class="field"><label for="recall-answer">암송 답안</label>
+        <textarea id="recall-answer" required autocomplete="off" spellcheck="false">${esc(recall.draft || '')}</textarea>
+        <p class="hint">채점할 때 띄어쓰기와 문장 부호는 제외합니다.</p>
+        <button class="btn primary" type="submit">답안 확인</button></form>` :
+        '<button class="btn primary" id="reveal">원문과 대조하기</button>'}`;
   } else {
-    controls = `<p class="recall-text">${esc(part)}</p><p>방금 말한 내용과 원문을 비교해 보세요.</p>
-      <div class="row"><button class="btn" id="again">가리고 다시 말하기</button>
+    controls = `<p class="recall-text">${esc(part)}</p>${typing ? `<p role="status">${typedCorrectly ? '원문과 일치합니다.' : '원문과 다른 부분이 있습니다.'}</p>
+      <h3>내 답안</h3><p class="recall-text">${esc(recall.draft)}</p>` : '<p>방금 말한 내용과 원문을 비교해 보세요.</p>'}
+      <div class="row"><button class="btn" id="again">${typing ? '가리고 다시 입력하기' : '가리고 다시 말하기'}</button>
       ${!partial && !recall.assisted ? '<button class="btn" id="practice-parts">짧은 구절 다시 연습</button>' : ''}
-      <button class="btn primary" id="recalled">${recall.assisted ? '힌트 없이 다시 시도' : '스스로 정확히 말했어요'}</button></div>`;
+      ${!typing || typedCorrectly ? `<button class="btn primary" id="recalled">${recall.assisted ? '힌트 없이 다시 시도' : typing ? '계속' : '스스로 정확히 말했어요'}</button>` : ''}</div>`;
   }
-  exercise.innerHTML = `<section class="panel"><h2 id="recall-title" tabindex="-1">${esc(heading)}</h2>${controls}</section>`;
+  exercise.innerHTML = `<section class="panel"><h2 id="recall-title" tabindex="-1">${esc(heading)}</h2>${modeControls}${controls}</section>`;
   if (recall.focus) $('#recall-title').focus();
   recall.focus = true;
   const redraw = phase => { recall.phase = phase; recite(v, exercise, partial); };
-  const again = () => { recall.hint = false; recall.assisted = false; redraw('recall'); };
+  const again = () => {
+    recall.hint = false;
+    recall.assisted = false;
+    recall.draft = '';
+    redraw('recall');
+    $('#recall-answer')?.focus();
+  };
+  const setMode = mode => {
+    recallMode = mode;
+    try { localStorage.setItem('versepath.recallMode', mode); } catch {}
+    redraw(recall.phase);
+    $(mode === 'type' ? '#type-recall' : '#speak-recall').focus();
+  };
+  if ($('#type-recall')) $('#type-recall').onclick = () => setMode('type');
+  if ($('#speak-recall')) $('#speak-recall').onclick = () => setMode('speak');
+  if ($('#recall-answer')) $('#recall-answer').oninput = e => { recall.draft = e.target.value; };
+  if ($('#recall-form')) $('#recall-form').onsubmit = e => {
+    e.preventDefault();
+    recall.draft = $('#recall-answer').value.trim();
+    if (recall.draft) redraw('compare');
+  };
   if ($('#hide-text')) $('#hide-text').onclick = again;
   if ($('#again')) $('#again').onclick = again;
   if ($('#hint')) $('#hint').onclick = () => { recall.hint = true; recall.assisted = true; redraw('recall'); };
@@ -277,5 +332,5 @@ function recite(v, exercise, partial) {
     }
   };
 }
-function settings(){root.innerHTML=`<h1>설정 및 백업</h1><p class="muted intro">학습 데이터는 현재 브라우저에만 저장됩니다. 기기를 바꾸기 전에 백업 파일을 보관해 주세요.</p><section class="panel"><h2>데이터 보관</h2><p class="muted">말씀 ${data.verses.length}개와 단계별 기록을 JSON 파일로 내보내고 다시 가져올 수 있습니다.</p><div class="setting-actions"><button class="btn primary" id="export">백업 내려받기</button><label class="btn" for="import" style="cursor:pointer">백업 불러오기</label><input id="import" type="file" accept=".json,application/json" hidden></div><div class="divider"></div><button class="btn danger" id="reset">모든 데이터 초기화</button></section><section class="panel"><h2>사용 안내</h2><p class="muted">말씀 목록에서 구절을 추가하고 암송 학습 탭에서 학습합니다. 빈칸 연습 후 소리 내어 암송하고, 다음 날 말씀 목록에서 복습합니다. 학습은 브라우저에서 실행되고 별도의 계정이나 서버가 필요하지 않습니다.</p><p class="hint">브라우저의 사이트 데이터 삭제, 시크릿 모드 또는 다른 기기에서는 기록이 유지되지 않을 수 있습니다. 저작권이 있는 번역본은 공개 저장소에 대량 수록하지 마세요.</p></section>`;$('#export').onclick=()=>{const blob=new Blob([JSON.stringify({format:'versepath',version:1,exportedAt:new Date().toISOString(),data},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='versepath-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};$('#import').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;e.target.value='';if(file.size>2_000_000){toast('백업 파일이 너무 큽니다');return}try{const p=JSON.parse(await file.text());if(p.format!=='versepath'||!Array.isArray(p.data?.verses))throw Error('invalid');const restored = normalize(p.data);if(!confirm('현재 데이터를 백업 파일로 교체하시겠습니까?'))return;data=restored;resetAttempt();reviewing=false;save();toast('백업을 가져왔습니다');render()}catch(err){toast('올바른 백업 파일이 아닙니다')}};$('#reset').onclick=()=>{if(confirm('모든 말씀과 학습 기록을 초기화하시겠습니까?')){data=fresh();resetAttempt();reviewing=false;save();render()}}}
+function settings(){root.innerHTML=`<h1>설정 및 백업</h1><p class="muted intro">학습 데이터는 현재 브라우저에만 저장됩니다. 기기를 바꾸기 전에 백업 파일을 보관해 주세요.</p><section class="panel"><h2>데이터 보관</h2><p class="muted">말씀 ${data.verses.length}개와 단계별 기록을 JSON 파일로 내보내고 다시 가져올 수 있습니다.</p><div class="setting-actions"><button class="btn primary" id="export">백업 내려받기</button><label class="btn" for="import" style="cursor:pointer">백업 불러오기</label><input id="import" type="file" accept=".json,application/json" hidden></div><div class="divider"></div><button class="btn danger" id="reset">모든 데이터 초기화</button></section><section class="panel"><h2>사용 안내</h2><p class="muted">말씀 목록에서 구절을 추가하고 암송 학습 탭에서 학습합니다. 빈칸 연습 후 말하거나 직접 입력해 암송하고, 다음 날 말씀 목록에서 복습합니다. 학습은 브라우저에서 실행되고 별도의 계정이나 서버가 필요하지 않습니다.</p><p class="hint">브라우저의 사이트 데이터 삭제, 시크릿 모드 또는 다른 기기에서는 기록이 유지되지 않을 수 있습니다. 저작권이 있는 번역본은 공개 저장소에 대량 수록하지 마세요.</p></section>`;$('#export').onclick=()=>{const blob=new Blob([JSON.stringify({format:'versepath',version:1,exportedAt:new Date().toISOString(),data},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='versepath-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};$('#import').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;e.target.value='';if(file.size>2_000_000){toast('백업 파일이 너무 큽니다');return}try{const p=JSON.parse(await file.text());if(p.format!=='versepath'||!Array.isArray(p.data?.verses))throw Error('invalid');const restored = normalize(p.data);if(!confirm('현재 데이터를 백업 파일로 교체하시겠습니까?'))return;data=restored;resetAttempt();reviewing=false;save();toast('백업을 가져왔습니다');render()}catch(err){toast('올바른 백업 파일이 아닙니다')}};$('#reset').onclick=()=>{if(confirm('모든 말씀과 학습 기록을 초기화하시겠습니까?')){data=fresh();resetAttempt();reviewing=false;save();render()}}}
 document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{editId=null;resetAttempt();reviewing=false;go(b.dataset.view)});if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));render();
