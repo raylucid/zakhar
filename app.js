@@ -5,7 +5,7 @@ const initial=[
 {id:'sample-1',ref:'고린도전서 6:19–20',text:'너희 몸은 너희가 하나님께로부터 받은 바 너희 가운데 계신 성령의 전인 줄을 알지 못하느냐 너희는 너희 자신의 것이 아니라\n값으로 산 것이 되었으니 그런즉 너희 몸으로 하나님께 영광을 돌리라',progress:0,mistakes:emptyMistakes()},
 {id:'sample-2',ref:'디모데후서 2:22',text:'또한 너는 청년의 정욕을 피하고 주를 깨끗한 마음으로 부르는 자들과 함께 의와 믿음과 사랑과 화평을 따르라',progress:0,mistakes:emptyMistakes()}
 ];
-function fresh() { return {learningVersion: 2, verses: structuredClone(initial), selected: 'sample-1'}; }
+function fresh() { return {learningVersion: 3, verses: structuredClone(initial), selected: 'sample-1'}; }
 
 function normalize(saved) {
   if (!Array.isArray(saved?.verses) || saved.verses.length > 1000) throw Error('invalid verses');
@@ -15,12 +15,13 @@ function normalize(saved) {
         typeof item.ref !== 'string' || !item.ref.trim() || item.ref.length > 120 ||
         typeof item.text !== 'string' || !item.text.trim() || item.text.length > 12000) throw Error('invalid verse');
     seen.add(item.id);
-    const progress = Math.max(0, Math.min(saved.learningVersion === 2 ? 5 : 3, Math.trunc(Number(item.progress) || 0)));
+    const storedProgress = Math.max(0, Math.min(saved.learningVersion === 3 ? 4 : saved.learningVersion === 2 ? 5 : 3, Math.trunc(Number(item.progress) || 0)));
     const mistakes = Object.assign(Object.create(null), item.mistakes && typeof item.mistakes === 'object' ? item.mistakes : {});
-    const reviewOn = progress === 5 && /^\d{4}-\d{2}-\d{2}$/.test(item.reviewOn) ? item.reviewOn : null;
-    return {id: item.id, ref: item.ref, text: item.text, progress: progress === 5 && !reviewOn ? 4 : progress, mistakes, reviewOn};
+    const progress = saved.learningVersion === 2 && storedProgress >= 4 ? storedProgress - 1 : storedProgress;
+    const reviewOn = progress === 4 && /^\d{4}-\d{2}-\d{2}$/.test(item.reviewOn) ? item.reviewOn : null;
+    return {id: item.id, ref: item.ref, text: item.text, progress: progress === 4 && !reviewOn ? 3 : progress, mistakes, reviewOn};
   });
-  return {learningVersion: 2, verses, selected: seen.has(saved.selected) ? saved.selected : verses[0]?.id};
+  return {learningVersion: 3, verses, selected: seen.has(saved.selected) ? saved.selected : verses[0]?.id};
 }
 
 function load() {
@@ -39,7 +40,7 @@ function candidates(v){return words(v).map((w,i)=>({w,i})).filter(x=>x.w!=='\n')
 function go(v){view=v;document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===v));render()}
 function render(){if(view==='library')library();else if(view==='study')study();else settings()}
 function library(){if(editId!==null){editor();return}const reviews = data.verses.filter(v => due(v));
-root.innerHTML=`<h1>내 말씀 목록</h1><p class="muted intro">구절을 추가하고, 익숙해질수록 빈칸을 늘려 암송해 보세요.</p>${reviews.length ? `<section class="panel"><h2>오늘의 복습</h2><div class="row">${reviews.map(v => `<button class="btn primary" data-review="${esc(v.id)}">${esc(v.ref)} 복습</button>`).join('')}</div></section>` : ''}<div class="toolbar"><span class="muted">등록된 구절 <b>${data.verses.length}</b>개</span><button class="btn primary" id="add">+ 말씀 추가</button></div>${data.verses.length?`<section class="verse-grid">${data.verses.map(v=>`<article class="verse-card"><div class="row"><span class="pill">${v.progress === 5 ? '첫 학습 완료' : stageNames[v.progress]}</span></div><div class="ref">${esc(v.ref)}</div><div class="preview">${esc(v.text)}</div><div class="sub">단어 ${candidates(v).length}개</div><div class="actions"><button class="btn primary small" data-study="${esc(v.id)}"> ${v.progress === 0 ? '암송 시작' : v.progress === 5 ? '암송 다시 하기' : '이어서 암송'}</button><button class="btn small" data-edit="${esc(v.id)}">수정</button><button class="btn danger small" data-delete="${esc(v.id)}">말씀 삭제</button></div></article>`).join('')}</section>`:`<div class="empty"><h2>아직 등록된 말씀이 없습니다</h2><p class="muted">첫 번째 암송 구절을 추가해 주세요.</p></div>`}`;root.querySelectorAll('[data-review]').forEach(button => button.onclick = () => {
+root.innerHTML=`<h1>내 말씀 목록</h1><p class="muted intro">구절을 추가하고, 익숙해질수록 빈칸을 늘려 암송해 보세요.</p>${reviews.length ? `<section class="panel"><h2>오늘의 복습</h2><div class="row">${reviews.map(v => `<button class="btn primary" data-review="${esc(v.id)}">${esc(v.ref)} 복습</button>`).join('')}</div></section>` : ''}<div class="toolbar"><span class="muted">등록된 구절 <b>${data.verses.length}</b>개</span><button class="btn primary" id="add">+ 말씀 추가</button></div>${data.verses.length?`<section class="verse-grid">${data.verses.map(v=>`<article class="verse-card"><div class="row"><span class="pill">${v.progress === 4 ? '첫 학습 완료' : stageNames[v.progress]}</span></div><div class="ref">${esc(v.ref)}</div><div class="preview">${esc(v.text)}</div><div class="sub">단어 ${candidates(v).length}개</div><div class="actions"><button class="btn primary small" data-study="${esc(v.id)}"> ${v.progress === 0 ? '암송 시작' : v.progress === 4 ? '암송 다시 하기' : '이어서 암송'}</button><button class="btn small" data-edit="${esc(v.id)}">수정</button><button class="btn danger small" data-delete="${esc(v.id)}">말씀 삭제</button></div></article>`).join('')}</section>`:`<div class="empty"><h2>아직 등록된 말씀이 없습니다</h2><p class="muted">첫 번째 암송 구절을 추가해 주세요.</p></div>`}`;root.querySelectorAll('[data-review]').forEach(button => button.onclick = () => {
   data.selected = button.dataset.review;
   reviewing = true;
   resetAttempt();
@@ -63,8 +64,8 @@ function deleteVerse(v) {
   toast('말씀을 삭제했습니다');
 }
 
-function editor(){const v=data.verses.find(v=>v.id===editId);root.innerHTML=`<h1>${v?'말씀 수정':'새 말씀 추가'}</h1><p class="muted intro">성경 본문은 입력한 그대로 사용됩니다. 번역본을 확인하여 붙여 넣어 주세요.</p><form class="panel" id="editor"><label class="field">성경 장절<input name="ref" maxlength="120" required placeholder="예: 요한복음 15:5" value="${esc(v?.ref||'')}"></label><label class="field">말씀 본문<textarea name="text" required maxlength="12000" placeholder="성경 본문을 입력하세요">${esc(v?.text||'')}</textarea></label><p class="hint">공백 기준으로 단어가 분리되며, 빈 줄을 포함한 줄바꿈은 보존됩니다. 구절을 수정하면 암송 단계와 오답 및 복습 기록이 초기화됩니다.</p><div class="row end"><button type="button" class="btn" id="cancel">취소</button>${v ? '<button type="button" class="btn danger" id="delete-verse">말씀 삭제</button>' : ''}<button class="btn primary" type="submit">저장하기</button></div></form>`;$('#cancel').onclick=()=>{editId=null;render()};if (v) $('#delete-verse').onclick = () => deleteVerse(v);$('#editor').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),ref=String(fd.get('ref')).trim(),text=String(fd.get('text')).trim();if(!ref||!text||!candidates({text}).length){toast('장절과 본문을 입력해 주세요');return}if(v){Object.assign(v,{ref,text,progress:0,mistakes:emptyMistakes(),reviewOn:null})}else{const nv={id:crypto.randomUUID?.()||'v'+Date.now(),ref,text,progress:0,mistakes:emptyMistakes()};data.verses.push(nv);data.selected=nv.id}save();editId=null;toast('말씀을 저장했습니다');render()}}
-const stageNames = ['본문 읽기', '첫 빈칸', '빈칸 늘리기', '짧게 끊어 암송', '한 절 암송'];
+function editor(){const v=data.verses.find(v=>v.id===editId);root.innerHTML=`<h1>${v?'말씀 수정':'새 말씀 추가'}</h1><p class="muted intro">성경 본문은 입력한 그대로 사용됩니다. 번역본을 확인하여 붙여 넣어 주세요.</p><form class="panel" id="editor"><label class="field">성경 장절<input name="ref" maxlength="120" required placeholder="예: 요한복음 15:5" value="${esc(v?.ref||'')}"></label><label class="field">말씀 본문<textarea name="text" required maxlength="12000" placeholder="성경 본문을 입력하세요">${esc(v?.text||'')}</textarea></label><p class="hint">본문을 그대로 붙여 넣으세요. 원하는 곳에서 줄을 바꾸면 그 단위로도 연습할 수 있습니다. 구절을 수정하면 암송 단계와 오답 및 복습 기록이 초기화됩니다.</p><div class="row end"><button type="button" class="btn" id="cancel">취소</button>${v ? '<button type="button" class="btn danger" id="delete-verse">말씀 삭제</button>' : ''}<button class="btn primary" type="submit">저장하기</button></div></form>`;$('#cancel').onclick=()=>{editId=null;render()};if (v) $('#delete-verse').onclick = () => deleteVerse(v);$('#editor').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),ref=String(fd.get('ref')).trim(),text=String(fd.get('text')).trim();if(!ref||!text||!candidates({text}).length){toast('장절과 본문을 입력해 주세요');return}if(v){Object.assign(v,{ref,text,progress:0,mistakes:emptyMistakes(),reviewOn:null})}else{const nv={id:crypto.randomUUID?.()||'v'+Date.now(),ref,text,progress:0,mistakes:emptyMistakes()};data.verses.push(nv);data.selected=nv.id}save();editId=null;toast('말씀을 저장했습니다');render()}}
+const stageNames = ['본문 읽기', '첫 빈칸', '빈칸 늘리기', '전체 암송'];
 let recall = null;
 let reviewing = false;
 let blankMode = 'choice';
@@ -81,12 +82,7 @@ function due(v, today = dateKey()) {
 }
 
 function chunks(v) {
-  return v.text.trim().split(/\n+|(?<=[.!?。！？])\s+/u).flatMap(line => {
-    const tokens = line.trim().split(/\s+/u);
-    const groups = [];
-    for (let i = 0; i < tokens.length; i += 8) groups.push(tokens.slice(i, i + 8).join(' '));
-    return groups;
-  }).filter(Boolean);
+  return v.text.split(/\r\n?|\n|(?<=[.!?。！？])\s+/u).map(part => part.trim()).filter(Boolean);
 }
 
 function makeQuiz(v) {
@@ -119,14 +115,14 @@ function study() {
     return;
   }
 
-  const level = reviewing ? 4 : v.progress;
-  const label = reviewing ? '복습 · 한 절 암송' : level === 5
-    ? '첫 학습 완료' : `${level + 1} / 5단계 · ${stageNames[level]}`;
+  const level = reviewing ? 3 : v.progress;
+  const label = reviewing ? '복습 · 전체 암송' : level === 4
+    ? '첫 학습 완료' : `${level + 1} / 4단계 · ${stageNames[level]}`;
   root.innerHTML = `<div class="study-heading"><h1 id="study-title" tabindex="-1">구절 암송</h1>
     <select id="verse-select" aria-label="암송할 구절">${data.verses.map(item =>
       `<option value="${esc(item.id)}" ${item.id === v.id ? 'selected' : ''}>${esc(item.ref)}</option>`).join('')}</select>
     <p class="muted">${label}</p></div><div id="exercise"></div>
-    ${!reviewing && level > 0 && level < 5 ? '<button class="btn small" id="prev">← 이전 단계</button>' : ''}
+    ${!reviewing && level > 0 && level < 4 ? '<button class="btn small" id="prev">← 이전 단계</button>' : ''}
     ${reviewing ? '<button class="btn small" id="exit-review">← 말씀 목록</button>' : ''}`;
   $('#verse-select').onchange = e => {
     data.selected = e.target.value;
@@ -146,8 +142,8 @@ function study() {
     $('#advance').onclick = () => nextStage(v);
   } else if (level <= 2) {
     fillBlanks(v, exercise);
-  } else if (level <= 4) {
-    recite(v, exercise, level === 3);
+  } else if (level === 3) {
+    recite(v, exercise, false);
   } else {
     exercise.innerHTML = `<section class="panel"><h2>${esc(v.ref)}</h2><p>${due(v) ? '오늘 복습할 말씀입니다.' : `다음 복습일 ${esc(v.reviewOn || dateKey(1))}`}</p>
       <button class="btn primary" id="practice">${due(v) ? '복습 시작' : '지금 다시 암송'}</button></section>`;
@@ -326,7 +322,7 @@ function recite(v, exercise, partial) {
   const parts = chunks(v);
   recall ??= {index: 0, phase: partial ? 'read' : 'recall', hint: false, assisted: false, focus: false};
   const part = partial ? parts[recall.index] : v.text;
-  const heading = partial ? `짧은 구절 ${recall.index + 1} / ${parts.length}` : v.ref;
+  const heading = partial ? `구간 ${recall.index + 1} / ${parts.length}` : v.ref;
   const typing = recallMode === 'type';
   const result = gradeRecall(recall.draft || '', partial ? parts : [part], partial ? recall.index : 0, partial);
   const typedCorrectly = typing && result !== 'different';
@@ -356,10 +352,12 @@ function recite(v, exercise, partial) {
       <h3>내 답안</h3><p class="recall-text">${differences?.answer ?? esc(recall.draft)}</p>` :
       `<p class="recall-text">${esc(part)}</p><p>방금 말한 내용과 원문을 비교해 보세요.</p>`}
       <div class="row"><button class="btn" id="again">${typing ? '가리고 다시 입력하기' : '가리고 다시 말하기'}</button>
-      ${!partial && !recall.assisted ? '<button class="btn" id="practice-parts">짧은 구절 다시 연습</button>' : ''}
       ${!typing || typedCorrectly ? `<button class="btn primary" id="recalled">${recall.assisted ? '힌트 없이 다시 시도' : typing ? '계속' : '스스로 정확히 말했어요'}</button>` : ''}</div>`;
   }
-  exercise.innerHTML = `<section class="panel"><h2 id="recall-title" tabindex="-1">${esc(heading)}</h2>${boundary}${modeControls}${controls}</section>`;
+  const practiceControl = partial
+    ? '<button class="btn small" id="return-whole">전체 암송으로 돌아가기</button>'
+    : parts.length > 1 ? '<button class="btn small" id="practice-parts">구간별로 연습하기</button>' : '';
+  exercise.innerHTML = `<section class="panel"><h2 id="recall-title" tabindex="-1">${esc(heading)}</h2>${boundary}${modeControls}${controls}${practiceControl}</section>`;
   if (recall.focus) $('#recall-title').focus();
   recall.focus = true;
   const redraw = phase => { recall.phase = phase; recite(v, exercise, partial); };
@@ -388,27 +386,22 @@ function recite(v, exercise, partial) {
   if ($('#again')) $('#again').onclick = again;
   if ($('#hint')) $('#hint').onclick = () => { recall.hint = true; recall.assisted = true; redraw('recall'); };
   if ($('#reveal')) $('#reveal').onclick = () => redraw('compare');
-  if ($('#practice-parts')) $('#practice-parts').onclick = () => {
-    resetAttempt();
-    if (reviewing) {
-      recite(v, exercise, true);
-    } else {
-      v.progress = 3;
-      save();
-      render();
-      $('#study-title').focus();
-    }
+  const switchPractice = useParts => {
+    recall = null;
+    recite(v, exercise, useParts);
+    $('#recall-title').focus();
   };
+  if ($('#practice-parts')) $('#practice-parts').onclick = () => switchPractice(true);
+  if ($('#return-whole')) $('#return-whole').onclick = () => switchPractice(false);
   if ($('#recalled')) $('#recalled').onclick = () => {
     if (recall.assisted) { again(); return; }
     if (partial && recall.index + 1 < parts.length) {
       recall.index++;
       redraw('read');
     } else if (partial) {
-      if (reviewing) { recall = null; recite(v, exercise, false); }
-      else nextStage(v);
+      switchPractice(false);
     } else {
-      v.progress = 5;
+      v.progress = 4;
       // A same-day practice keeps the review that was already scheduled.
       if (!v.reviewOn || due(v)) v.reviewOn = dateKey(1);
       reviewing = false;
