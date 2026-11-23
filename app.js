@@ -319,6 +319,66 @@ function gradeRecall(answer, parts, index, partial) {
   return 'different';
 }
 
+function recallDifferences(original, answer) {
+  // Keep the displayed punctuation and spacing while aligning only scored characters.
+  const characters = text => Array.from(text.normalize('NFC'), char => ({
+    char, marked: comparableRecall(char) !== ''
+  }));
+  const source = characters(original);
+  const draft = characters(answer);
+  const expected = source.filter(unit => unit.marked);
+  const actual = draft.filter(unit => unit.marked);
+  let start = 0;
+  let endExpected = expected.length;
+  let endActual = actual.length;
+  while (start < endExpected && start < endActual && expected[start].char === actual[start].char) {
+    expected[start].marked = actual[start].marked = false;
+    start++;
+  }
+  while (endExpected > start && endActual > start && expected[endExpected - 1].char === actual[endActual - 1].char) {
+    expected[--endExpected].marked = actual[--endActual].marked = false;
+  }
+
+  const rows = endExpected - start;
+  const columns = endActual - start;
+  const stride = columns + 1;
+  // Leave the middle marked for unusually large inputs to bound memory and runtime.
+  if (rows && columns && rows * columns <= 2_000_000) {
+    const shared = new Uint16Array((rows + 1) * stride);
+    for (let i = rows - 1; i >= 0; i--) {
+      for (let j = columns - 1; j >= 0; j--) {
+        const offset = i * stride + j;
+        shared[offset] = expected[start + i].char === actual[start + j].char
+          ? shared[offset + stride + 1] + 1
+          : Math.max(shared[offset + stride], shared[offset + 1]);
+      }
+    }
+    let i = 0, j = 0;
+    while (i < rows && j < columns) {
+      if (expected[start + i].char === actual[start + j].char) {
+        expected[start + i++].marked = actual[start + j++].marked = false;
+      } else if (shared[(i + 1) * stride + j] >= shared[i * stride + j + 1]) {
+        i++;
+      } else {
+        j++;
+      }
+    }
+  }
+
+  const renderMarks = (units, kind) => {
+    const groups = [];
+    for (const unit of units) {
+      const last = groups.at(-1);
+      if (last?.marked === unit.marked) last.text += unit.char;
+      else groups.push({text: unit.char, marked: unit.marked});
+    }
+    return groups.map(group => group.marked
+      ? `<mark class="recall-mark ${kind}">${esc(group.text)}</mark>`
+      : esc(group.text)).join('');
+  };
+  return {original: renderMarks(source, 'recall-expected'), answer: renderMarks(draft, 'recall-entered')};
+}
+
 let recallMode = 'speak';
 try {
   if (localStorage.getItem('versepath.recallMode') === 'type') recallMode = 'type';
@@ -351,8 +411,12 @@ function recite(v, exercise, partial) {
         <button class="btn primary" type="submit">답안 확인</button></form>` :
         '<button class="btn primary" id="reveal">원문과 대조하기</button>'}`;
   } else {
-    controls = `<p class="recall-text">${esc(part)}</p>${typing ? `<p role="status">${feedback[result]}</p>
-      <h3>내 답안</h3><p class="recall-text">${esc(recall.draft)}</p>` : '<p>방금 말한 내용과 원문을 비교해 보세요.</p>'}
+    const differences = typing && !typedCorrectly ? recallDifferences(part, recall.draft) : null;
+    controls = `${typing ? `<p role="status">${feedback[result]}</p>
+      ${differences ? '<p class="hint">원문에서는 빠지거나 바뀐 글자를, 내 답안에서는 다르게 입력한 글자를 표시합니다.</p>' : ''}
+      <h3>원문</h3><p class="recall-text">${differences?.original ?? esc(part)}</p>
+      <h3>내 답안</h3><p class="recall-text">${differences?.answer ?? esc(recall.draft)}</p>` :
+      `<p class="recall-text">${esc(part)}</p><p>방금 말한 내용과 원문을 비교해 보세요.</p>`}
       <div class="row"><button class="btn" id="again">${typing ? '가리고 다시 입력하기' : '가리고 다시 말하기'}</button>
       ${!partial && !recall.assisted ? '<button class="btn" id="practice-parts">짧은 구절 다시 연습</button>' : ''}
       ${!typing || typedCorrectly ? `<button class="btn primary" id="recalled">${recall.assisted ? '힌트 없이 다시 시도' : typing ? '계속' : '스스로 정확히 말했어요'}</button>` : ''}</div>`;
