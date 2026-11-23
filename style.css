@@ -16,3 +16,4 @@ details { margin-bottom: 1rem; }
 .recall-input input { min-width: 0; padding: .65rem; border: 1px solid #c7ccda; border-radius: 8px; }
 .btn[aria-pressed="true"] { background: #ecebff; color: #40369d; border-color: #726bc6; }
 .recall-mode { margin-bottom: 1rem; }
+.range-note { color: #40369d; background: #ecebff; border-radius: 10px; padding: .5rem .75rem; }

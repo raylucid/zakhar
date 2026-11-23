@@ -63,7 +63,69 @@ function deleteVerse(v) {
   toast('말씀을 삭제했습니다');
 }
 
-function editor(){const v=data.verses.find(v=>v.id===editId);root.innerHTML=`<h1>${v?'말씀 수정':'새 말씀 추가'}</h1><p class="muted intro">성경 본문은 입력한 그대로 사용됩니다. 번역본을 확인하여 붙여 넣어 주세요.</p><form class="panel" id="editor"><label class="field">성경 장절<input name="ref" maxlength="120" required placeholder="예: 요한복음 15:5" value="${esc(v?.ref||'')}"></label><label class="field">말씀 본문<textarea name="text" required maxlength="12000" placeholder="성경 본문을 입력하세요">${esc(v?.text||'')}</textarea></label><p class="hint">공백 기준으로 단어가 분리되며, 빈 줄을 포함한 줄바꿈은 보존됩니다. 구절을 수정하면 암송 단계와 오답 및 복습 기록이 초기화됩니다.</p><div class="row end"><button type="button" class="btn" id="cancel">취소</button>${v ? '<button type="button" class="btn danger" id="delete-verse">말씀 삭제</button>' : ''}<button class="btn primary" type="submit">저장하기</button></div></form>`;$('#cancel').onclick=()=>{editId=null;render()};if (v) $('#delete-verse').onclick = () => deleteVerse(v);$('#editor').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),ref=String(fd.get('ref')).trim(),text=String(fd.get('text')).trim();if(!ref||!text||!candidates({text}).length){toast('장절과 본문을 입력해 주세요');return}if(v){Object.assign(v,{ref,text,progress:0,mistakes:emptyMistakes(),reviewOn:null})}else{const nv={id:crypto.randomUUID?.()||'v'+Date.now(),ref,text,progress:0,mistakes:emptyMistakes()};data.verses.push(nv);data.selected=nv.id}save();editId=null;toast('말씀을 저장했습니다');render()}}
+function lookupPassage(result) {
+  const verses = Array.isArray(result) ? result : [result];
+  if (!verses.length || verses.some(verse =>
+    typeof verse?.reference !== 'string' || !verse.reference.trim() ||
+    typeof verse.text !== 'string' || !verse.text.trim())) throw Error('invalid response');
+  const first = verses[0].reference;
+  const last = verses.at(-1).reference;
+  const ref = verses.length === 1 ? first : first + '–' + last.split(':').at(-1);
+  const text = verses.map(verse => verse.text).join('\n');
+  if (ref.length > 120 || text.length > 12000) throw Error('response too long');
+  return {ref, text};
+}
+
+function attachLookup(form) {
+  const button = $('#lookup');
+  const status = $('#lookup-status');
+  if (!button || !status) return;
+  const endpoint = document.querySelector('meta[name="logos-lookup-endpoint"]')?.content;
+  if (!endpoint) return;
+  button.disabled = false;
+  status.textContent = '장절을 입력하고 본문을 불러오세요.';
+  const refInput = form.elements.namedItem('ref');
+  const textInput = form.elements.namedItem('text');
+  button.onclick = async () => {
+    const input = refInput.value.trim();
+    if (!input) {
+      status.textContent = '조회할 장절을 입력해 주세요.';
+      refInput.focus();
+      return;
+    }
+    const previousText = textInput.value;
+    button.disabled = true;
+    status.textContent = '개역개정 본문을 찾는 중입니다.';
+    try {
+      const url = new URL(endpoint);
+      url.searchParams.set('ref', input.replace(/[–—]/gu, '-'));
+      const response = await fetch(url, {signal: AbortSignal.timeout(10000)});
+      if (!response.ok) {
+        status.textContent = ({
+          400: '책 이름, 장, 절을 확인해 주세요. 예: 요3:16-18',
+          404: '해당 구절을 찾지 못했습니다.',
+          429: '요청이 많습니다. 잠시 후 다시 조회해 주세요.'
+        })[response.status] || '지금은 본문을 조회할 수 없습니다. 잠시 후 다시 시도해 주세요.';
+        return;
+      }
+      const passage = lookupPassage(await response.json());
+      if (!form.isConnected) return;
+      if (refInput.value.trim() !== input || textInput.value !== previousText) {
+        status.textContent = '입력 내용이 바뀌었습니다. 필요하면 다시 조회해 주세요.';
+        return;
+      }
+      refInput.value = passage.ref;
+      textInput.value = passage.text;
+      status.textContent = '개역개정 · Logos API에서 불러왔습니다. 본문을 확인하고 저장하세요.';
+    } catch {
+      status.textContent = '본문을 불러오지 못했습니다. 다시 시도하거나 본문을 붙여넣어 주세요.';
+    } finally {
+      button.disabled = false;
+    }
+  };
+}
+
+function editor(){const v=data.verses.find(v=>v.id===editId);root.innerHTML=`<h1>${v?'말씀 수정':'새 말씀 추가'}</h1><p class="muted intro">성경 본문은 입력한 그대로 사용됩니다. 번역본을 확인하여 붙여 넣어 주세요.</p><form class="panel" id="editor"><label class="field">성경 장절<input name="ref" maxlength="120" required placeholder="예: 요한복음 15:5" value="${esc(v?.ref||'')}"></label>${v ? '' : '<button type="button" class="btn small" id="lookup" disabled>개역개정 본문 불러오기</button><p class="hint" id="lookup-status" role="status">자동 조회는 연결 준비 중입니다. 본문을 붙여넣어 추가할 수 있습니다.</p>'}<label class="field">말씀 본문<textarea name="text" required maxlength="12000" placeholder="성경 본문을 입력하세요">${esc(v?.text||'')}</textarea></label><p class="hint">공백 기준으로 단어가 분리되며, 빈 줄을 포함한 줄바꿈은 보존됩니다. 구절을 수정하면 암송 단계와 오답 및 복습 기록이 초기화됩니다.</p><div class="row end"><button type="button" class="btn" id="cancel">취소</button>${v ? '<button type="button" class="btn danger" id="delete-verse">말씀 삭제</button>' : ''}<button class="btn primary" type="submit">저장하기</button></div></form>`;$('#cancel').onclick=()=>{editId=null;render()};attachLookup($('#editor'));if (v) $('#delete-verse').onclick = () => deleteVerse(v);$('#editor').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),ref=String(fd.get('ref')).trim(),text=String(fd.get('text')).trim();if(!ref||!text||!candidates({text}).length){toast('장절과 본문을 입력해 주세요');return}if(v){Object.assign(v,{ref,text,progress:0,mistakes:emptyMistakes(),reviewOn:null})}else{const nv={id:crypto.randomUUID?.()||'v'+Date.now(),ref,text,progress:0,mistakes:emptyMistakes()};data.verses.push(nv);data.selected=nv.id}save();editId=null;toast('말씀을 저장했습니다');render()}}
 const stageNames = ['본문 읽기', '첫 빈칸', '빈칸 늘리기', '짧게 끊어 암송', '한 절 암송'];
 let recall = null;
 let reviewing = false;
@@ -239,6 +301,24 @@ function comparableRecall(text) {
   return text.normalize('NFC').replace(/[\p{P}\s]/gu, '');
 }
 
+function gradeRecall(answer, parts, index, partial) {
+  const actual = comparableRecall(answer);
+  const expected = comparableRecall(parts[index]);
+  if (actual === expected) return 'exact';
+  if (!partial || !expected) return 'different';
+
+  // Match through an input word boundary, so 마음으로만 is not 마음으로.
+  const words = answer.normalize('NFC').match(/[^\p{P}\s]+/gu) || [];
+  const preceding = comparableRecall(parts.slice(0, index).join(' '));
+  let prefix = '';
+  for (const word of words) {
+    prefix += word;
+    if (prefix === expected || (preceding && prefix === preceding + expected)) return 'range';
+    if (prefix.length > preceding.length + expected.length) break;
+  }
+  return 'different';
+}
+
 let recallMode = 'speak';
 try {
   if (localStorage.getItem('versepath.recallMode') === 'type') recallMode = 'type';
@@ -250,7 +330,12 @@ function recite(v, exercise, partial) {
   const part = partial ? parts[recall.index] : v.text;
   const heading = partial ? `짧은 구절 ${recall.index + 1} / ${parts.length}` : v.ref;
   const typing = recallMode === 'type';
-  const typedCorrectly = typing && comparableRecall(recall.draft || '') === comparableRecall(part);
+  const result = gradeRecall(recall.draft || '', partial ? parts : [part], partial ? recall.index : 0, partial);
+  const typedCorrectly = typing && result !== 'different';
+  const tokens = part.trim().split(/\s+/u);
+  const boundary = partial ? `<p class="range-note">이번 범위 · ${tokens.length}어절${tokens.length > 1 ? `, <strong>‘${esc(tokens.at(-1))}’</strong>까지` : ''}</p>` : '';
+  const feedback = {exact: '원문과 일치합니다.', range: '이번 범위는 맞았습니다. 범위 밖에 입력한 내용은 채점에서 제외했습니다.',
+    different: partial ? '이번 범위의 원문과 다른 부분이 있습니다.' : '원문과 다른 부분이 있습니다.'};
   const modeControls = recall.phase === 'compare' ? '' : `<div class="row recall-mode" role="group" aria-label="암송 방식">
     <button class="btn small" id="speak-recall" aria-pressed="${!typing}">소리 내어 암송</button>
     <button class="btn small" id="type-recall" aria-pressed="${typing}">직접 입력</button></div>`;
@@ -266,13 +351,13 @@ function recite(v, exercise, partial) {
         <button class="btn primary" type="submit">답안 확인</button></form>` :
         '<button class="btn primary" id="reveal">원문과 대조하기</button>'}`;
   } else {
-    controls = `<p class="recall-text">${esc(part)}</p>${typing ? `<p role="status">${typedCorrectly ? '원문과 일치합니다.' : '원문과 다른 부분이 있습니다.'}</p>
+    controls = `<p class="recall-text">${esc(part)}</p>${typing ? `<p role="status">${feedback[result]}</p>
       <h3>내 답안</h3><p class="recall-text">${esc(recall.draft)}</p>` : '<p>방금 말한 내용과 원문을 비교해 보세요.</p>'}
       <div class="row"><button class="btn" id="again">${typing ? '가리고 다시 입력하기' : '가리고 다시 말하기'}</button>
       ${!partial && !recall.assisted ? '<button class="btn" id="practice-parts">짧은 구절 다시 연습</button>' : ''}
       ${!typing || typedCorrectly ? `<button class="btn primary" id="recalled">${recall.assisted ? '힌트 없이 다시 시도' : typing ? '계속' : '스스로 정확히 말했어요'}</button>` : ''}</div>`;
   }
-  exercise.innerHTML = `<section class="panel"><h2 id="recall-title" tabindex="-1">${esc(heading)}</h2>${modeControls}${controls}</section>`;
+  exercise.innerHTML = `<section class="panel"><h2 id="recall-title" tabindex="-1">${esc(heading)}</h2>${boundary}${modeControls}${controls}</section>`;
   if (recall.focus) $('#recall-title').focus();
   recall.focus = true;
   const redraw = phase => { recall.phase = phase; recite(v, exercise, partial); };
