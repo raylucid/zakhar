@@ -1,4 +1,4 @@
-# 새김 — 범용 성경 암송 웹앱
+# 자카르 — 범용 성경 암송 웹앱
 
 브라우저에서 동작하는 무료·무서버 성경 암송 앱입니다. 외부 API나 패키지 설치 없이 GitHub Pages에서 사용 가능합니다.
 
@@ -12,11 +12,11 @@
 - PWA 홈 화면 설치 및 캐시된 오프라인 실행
 
 ## GitHub Pages 배포
-1. GitHub에서 **public** 저장소를 만듭니다. (예: `versepath`)
+1. GitHub에서 **public** 저장소를 만듭니다. (예: `zakhar`)
 2. 이 폴더 안의 파일을 저장소 최상위 경로에 업로드합니다. (`index.html`이 루트에 있어야 합니다.)
 3. 저장소의 **Settings → Pages → Build and deployment → Source: Deploy from a branch** 선택
 4. **Branch: main / (root)** 선택 후 Save
-5. 배포 완료 후 `https://사용자명.github.io/versepath/` 접속
+5. 배포 완료 후 `https://사용자명.github.io/zakhar/` 접속
 
 `/` 상대 경로를 사용하지 않아 저장소 하위 경로에서도 실행됩니다.
 
