@@ -34,7 +34,8 @@
 GitHub Pages는 정적 앱을 제공하고, 본문 조회는 `api/logos-worker.mjs`를 배포한 Cloudflare Worker가 중계합니다.
 
 1. 개역개정 본문을 이 앱에서 조회·표시하고 암송용으로 저장하는 이용 범위를 확인합니다.
-2. Worker에 `LOGOS_API_KEY`를 비밀 변수로 설정합니다.
-3. `index.html`의 `logos-lookup-endpoint`에 배포된 HTTPS Worker의 `/verse` 주소를 넣습니다.
+2. Cloudflare Workers에서 GitHub의 `raylucid/zakhar` 저장소를 가져옵니다. Worker 이름은 `zakhar-logos`, 브랜치는 `main`, 루트 디렉터리는 저장소 루트를 사용합니다.
+3. Worker 설정의 **Variables and Secrets**에서 `LOGOS_API_KEY`를 **Secret**으로 추가하고 배포합니다.
+4. `index.html`의 `logos-lookup-endpoint`에 배포된 HTTPS Worker의 `/verse` 주소를 넣습니다.
 
 연결이 설정되면 새 말씀 추가 화면에서 장절을 조회하고, 가져온 본문을 확인한 뒤 저장할 수 있습니다.

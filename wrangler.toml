@@ -1,0 +1,4 @@
+name = "zakhar-logos"
+main = "api/logos-worker.mjs"
+compatibility_date = "2026-11-23"
+workers_dev = true
